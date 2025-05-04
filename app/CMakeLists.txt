@@ -1,2 +1,4 @@
-add_executable(libframe_test main.c)
-target_link_libraries(libframe_test libframe)
+add_executable(app_main main.cpp)
+
+# Link libraries to the executable
+target_link_libraries(app_main PRIVATE libframe_cpp glfw OpenGL::GL)
