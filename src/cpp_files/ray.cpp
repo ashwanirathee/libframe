@@ -19,8 +19,11 @@ bool hitSphere(const Eigen::Vector3d &center, double radius, const Ray &ray)
 Eigen::Vector3d ray_color(const Ray &r, double v)
 {
     // // assuming ray hits, then we send the color of the sphere
-    if (hitSphere(Eigen::Vector3d(0, 0, -1), 0.1, r))
+    if (hitSphere(Eigen::Vector3d(0, 0, -1), 0.1, r)){
+        std::cout << "hit sphere" << std::endl;
         return Eigen::Vector3d(0, 0, 1); // blue sphere
+    }
+        
         
     return Eigen::Vector3d(1.0, 1.0, 1.0) * v; // white background
 }

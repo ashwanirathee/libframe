@@ -28,12 +28,15 @@ include_directories(include)
 add_library(libframe_c STATIC
     src/c_files/transform.c
     src/c_files/neural.c
+    src/c_files/raw.c
 )
 
 # Add C++ sources (C++ files in src/cpp_files)
 add_library(libframe_cpp STATIC
     src/cpp_files/pinhole.cpp
     src/cpp_files/ray.cpp
+    src/cpp_files/renderer.cpp
+    src/cpp_files/shader.cpp
 )
 
 # Link libraries (C++ code will link to C code, if necessary)
