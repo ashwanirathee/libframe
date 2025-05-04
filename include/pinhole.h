@@ -18,7 +18,23 @@ public:
                   double fov,
                   double aspect);
 
+    void updateCamera(const Eigen::Vector3d &eye,
+                      const Eigen::Vector3d &lookat,
+                      const Eigen::Vector3d &up,
+                      double fov,
+                      double aspect);
     Ray getRay(double u, double v) const;
+    // Getters
+    const Eigen::Vector3d &getOrigin() const { return origin; }
+    const Eigen::Vector3d &getHorizontal() const { return horizontal; }
+    const Eigen::Vector3d &getVertical() const { return vertical; }
+    const Eigen::Vector3d &getLowerLeftCorner() const { return lower_left_corner; }
+
+    // Setters
+    void setOrigin(const Eigen::Vector3d &o) { origin = o; }
+    void setHorizontal(const Eigen::Vector3d &h) { horizontal = h; }
+    void setVertical(const Eigen::Vector3d &v) { vertical = v; }
+    void setLowerLeftCorner(const Eigen::Vector3d &llc) { lower_left_corner = llc; }
 
 private:
     Eigen::Vector3d origin;
