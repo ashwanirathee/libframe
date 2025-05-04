@@ -15,6 +15,12 @@ find_package(GLFW3 REQUIRED)
 # Manually find GLFW (if not using package manager)
 find_package(GLFW3 REQUIRED PATHS /opt/homebrew/opt/glfw/lib/cmake/glfw3)
 
+# GLAD
+add_library(glad
+    external/glad/src/glad.c
+)
+target_include_directories(glad PUBLIC external/glad/include)
+
 # Include directories
 include_directories(include)
 
@@ -31,7 +37,11 @@ add_library(libframe_cpp STATIC
 )
 
 # Link libraries (C++ code will link to C code, if necessary)
-target_link_libraries(libframe_cpp PRIVATE libframe_c glfw OpenGL::GL)
+target_link_libraries(libframe_cpp PRIVATE libframe_c glad glfw OpenGL::GL)
+
+target_include_directories(libframe_cpp PRIVATE
+    external/glad/include
+)
 
 # Add subdirectory for app (where your main.cpp is)
 add_subdirectory(app)
