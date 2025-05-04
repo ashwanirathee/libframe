@@ -10,6 +10,6 @@ struct Ray
 };
 
 bool hitSphere(const Eigen::Vector3d &center, double radius, const Ray &ray);
-Eigen::Vector3d rayColor(const Ray &r);
+Eigen::Vector3d ray_color(const Ray &r, double v);
 
 #endif
