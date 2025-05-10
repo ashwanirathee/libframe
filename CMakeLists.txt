@@ -29,6 +29,8 @@ add_library(libframe_c STATIC
     src/c_files/transform.c
     src/c_files/neural.c
     src/c_files/raw.c
+    src/c_files/ppm.c
+    src/c_files/dead_pixel_correction.c
 )
 
 # Add C++ sources (C++ files in src/cpp_files)
