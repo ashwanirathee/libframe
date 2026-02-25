@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Quadrotor sim (Pyodide Worker) + Three.js</title>
+    <style>
+      body { margin: 0; overflow: hidden; font-family: system-ui; }
+      #hud {
+        position: absolute; left: 12px; top: 12px;
+        background: rgba(0,0,0,0.6); color: white;
+        padding: 10px 12px; border-radius: 8px;
+        min-width: 240px;
+      }
+      #hud label { display: block; margin-top: 6px; }
+      #hud input { width: 220px; }
+      #status { opacity: 0.9; font-size: 12px; margin-top: 6px; }
+      #state { white-space: pre; font-size: 12px; margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <div id="hud">
+      <div><b>Quad WASM Sim</b></div>
+
+      <label>Throttle (0..1)
+        <input id="throttle" type="range" min="0" max="1" step="0.001" value="0.55"/>
+      </label>
+
+      <label>Roll cmd (rad)
+        <input id="roll" type="range" min="-0.6" max="0.6" step="0.001" value="0"/>
+      </label>
+
+      <label>Pitch cmd (rad)
+        <input id="pitch" type="range" min="-0.6" max="0.6" step="0.001" value="0"/>
+      </label>
+
+      <label>Yaw rate cmd (rad/s)
+        <input id="yawrate" type="range" min="-2" max="2" step="0.01" value="0"/>
+      </label>
+
+      <button id="reset">Reset</button>
+      <button id="pause">Pause</button>
+      <div id="status">Loading…</div>
+      <div id="state"></div>
+    </div>
+    <script type="importmap">
+    {
+    "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+    }
+    </script>
+    <script type="module" src="./../js/1_wasm_quadrotor/main.js"></script>
+  </body>
+</html>
