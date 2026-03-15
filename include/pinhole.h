@@ -2,7 +2,7 @@
 #define PINHOLE_HPP
 
 #include <Eigen/Dense>
-#include "ray.h"
+#include <ray.h>
 
 // eye and origin are essentially the same thing
 // lookat is the point in space that the camera is looking at
