@@ -8,6 +8,7 @@ extern "C"
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 int load_raw_image(const char *filename, uint16_t **image_data, size_t *image_size, size_t width, size_t height);
 
