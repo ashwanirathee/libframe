@@ -55,3 +55,5 @@ Mkfile.old
 dkms.conf
 build/
 documents/
+data/
+__pycache__
