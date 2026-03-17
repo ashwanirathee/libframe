@@ -1,0 +1,357 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{graphicx}
+\usepackage{hyperref}
+
+\title{
+\texttt{libframe} : Low Level Image Processing
+}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+This writeup is intended to match the current goals of \texttt{libframe} as
+described in the project README. The project is not only about calibrating
+rolling-shutter webcams and an Arducam, but also about low-level camera
+control, stereo rectification, depth-oriented processing, and experiments on
+camera behavior through exposed controls such as auto exposure, white
+balance, and gain. In that sense, the document focuses both on geometric
+calibration and on low-level camera details that are relevant to 3A-style
+analysis and capture stability.
+
+\section{Rolling Shutter vs.\ Global Shutter}
+
+A global shutter camera exposes all pixels at the same instant. Each frame
+therefore corresponds to a single capture time, which matches the standard
+pinhole-camera assumption used by most calibration methods. If the camera or
+scene moves a little during exposure, the entire frame still represents one
+geometric snapshot.
+
+A rolling shutter camera does not expose all rows at once. Instead, the
+sensor is read out line by line, so the top and bottom of the image
+correspond to slightly different capture times. When the camera or the
+calibration target moves during this readout, the image is no longer a
+perfect perspective projection of a rigid scene at one instant. Straight
+lines may appear bent or slanted, and a planar calibration board can look
+geometrically warped.
+
+This matters because standard calibration algorithms assume that all observed
+corners in one image came from one fixed camera pose. That assumption is
+approximately true for rolling shutter cameras only when motion during
+capture is negligible. In practice, rolling shutter causes trouble when:
+
+\begin{itemize}
+\item the board is moved by hand while capturing,
+\item the camera is handheld or vibrating,
+\item the exposure time is long because the scene is dim,
+\item stereo cameras are not synchronized closely enough, or
+\item calibration images are taken during panning or rapid viewpoint changes.
+\end{itemize}
+
+For this project, the correct approach is to first calibrate the rolling
+shutter webcams using the ordinary camera model, but to collect the data in
+a way that minimizes rolling-shutter distortion. This gives a useful
+intrinsic calibration for static scenes and is usually the right first step
+before considering a more advanced rolling-shutter-aware model.
+
+\section{What Camera Calibration Is}
+
+Camera calibration estimates the parameters that map 3D scene points to 2D
+image measurements.
+
+The most important outputs are:
+
+\begin{itemize}
+\item \textbf{Intrinsic parameters:} focal lengths, principal point, and
+      lens distortion coefficients.
+\item \textbf{Extrinsic parameters:} the pose of the camera relative to the
+      calibration target for each image.
+\item \textbf{Stereo parameters:} for a stereo pair, the rigid transform
+      between the left and right cameras, along with rectification maps.
+\end{itemize}
+
+In our case, calibration is needed so that later steps such as rectification,
+disparity estimation, depth recovery, and feature triangulation use correct
+geometry rather than raw distorted image coordinates.
+
+\section{Procedure Used in This Project}
+
+The repository uses a ChArUco board, which combines ArUco markers with a
+chessboard layout. This gives two advantages: marker IDs help with robust
+detection, and the interpolated chessboard corners provide more accurate
+calibration points.
+
+Our current procedure is:
+
+\begin{enumerate}
+\item Print or prepare one fixed ChArUco board with known parameters:
+      number of squares in $x$ and $y$, square length, marker length, and
+      dictionary.
+\item Capture a set of images with \texttt{capture\_charuco}.
+\item Detect ArUco markers in each image.
+\item Interpolate ChArUco corners from the marker detections.
+\item Use the known board geometry and the detected 2D corners to estimate
+      the camera matrix and distortion coefficients.
+\item Reject large-error outlier images and repeat calibration for a small
+      number of passes.
+\item Save the final intrinsic calibration to a JSON file.
+\end{enumerate}
+
+The calibration succeeds only if the board description used during
+calibration matches the board used during capture. In particular,
+\texttt{squares-x} and \texttt{squares-y} refer to the number of squares on
+the board, not the number of inner corners. An incorrect board specification
+can produce very large reprojection errors even if corner detection looks
+successful.
+
+\section{Practical Calibration Procedure for Rolling Shutter Webcams}
+
+Because our webcams are rolling shutter devices, the calibration images must
+be collected carefully:
+
+\begin{itemize}
+\item Mount the camera rigidly if possible.
+\item Keep the ChArUco board still when each frame is captured.
+\item Use bright lighting to keep exposure time short.
+\item Avoid hand motion, panning, or fast viewpoint changes while taking
+      images.
+\item Capture a wide range of board poses: fronto-parallel views, tilted
+      views, and views near the image edges and corners.
+\item Remove blurry or obviously skewed images before calibration.
+\end{itemize}
+
+The goal is to make each image behave as closely as possible to a
+global-shutter snapshot. Under these conditions, standard calibration is
+usually good enough for static-scene stereo work.
+
+\section{Camera Settings for Calibration}
+
+Besides board motion and camera motion, camera control settings also affect
+how repeatable calibration images are. A calibration sequence works best when
+the appearance of the board stays consistent from frame to frame. Large
+automatic changes in exposure or white balance can make corner localization
+less stable and make the dataset harder to reason about.
+
+For the webcam controls we inspected, the important settings are auto
+exposure, exposure time, gain, white balance, anti-flicker mode, and
+backlight compensation.
+
+The current values are usable for rough capture, but they are not the most
+stable choice for calibration:
+
+\begin{itemize}
+\item \texttt{white\_balance\_automatic=1} means auto white balance is still
+      changing color response across frames.
+\item \texttt{auto\_exposure=3} means the camera is still choosing exposure
+      automatically.
+\item \texttt{exposure\_time\_absolute} is inactive in that mode, so exposure
+      cannot be fixed directly.
+\item \texttt{gain=0} is good if the scene is bright enough, because low gain
+      reduces noise.
+\item \texttt{power\_line\_frequency=50 Hz} is only appropriate under 50 Hz
+      lighting. For a webcam used in the United States, 60 Hz is usually the
+      better anti-flicker choice.
+\item \texttt{backlight\_compensation=80} may make exposure less predictable,
+      so it is better set to zero for calibration if possible.
+\end{itemize}
+
+The recommended approach is to lock the camera as much as the device allows:
+
+\begin{itemize}
+\item disable auto white balance and set a fixed white balance temperature,
+\item disable auto exposure and choose a fixed exposure time,
+\item keep gain low,
+\item set the power-line frequency to match the room lighting, and
+\item disable backlight compensation.
+\end{itemize}
+
+In practice, this means the calibration operator should first make the scene
+bright enough for a short exposure, then switch to manual settings and keep
+those settings unchanged while collecting all calibration images. If manual
+exposure produces dim images, the correct fix is usually more light rather
+than more gain. This is especially helpful for rolling shutter webcams,
+because brighter scenes allow shorter exposures and therefore reduce motion
+artifacts during readout.
+
+\section{Example of a Weak Calibration Frame}
+
+Figures~\ref{fig:auto-frame} and \ref{fig:bad-frame} show two representative
+captures from the project notes and dataset. They are useful because they
+illustrate different acquisition problems.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\linewidth]
+  {./charuco_0000_with_auto_white_balance_and_exposure.jpg}
+\caption{A ChArUco capture made with auto white balance and auto exposure.}
+\label{fig:auto-frame}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\linewidth]{./charuco_0004.jpg}
+\caption{An example of a weak calibration frame from the dataset.}
+\label{fig:bad-frame}
+\end{figure}
+
+The image in Figure~\ref{fig:auto-frame} is better centered and shows more of
+the board, but it still has calibration risks:
+
+\begin{itemize}
+\item the board is held by hand rather than mounted rigidly,
+\item auto white balance and auto exposure may change image appearance from
+      frame to frame,
+\item dim indoor lighting can force longer exposure times, and
+\item the board support may not remain perfectly flat and planar.
+\end{itemize}
+
+The image in Figure~\ref{fig:bad-frame} is weaker for several reasons:
+
+\begin{itemize}
+\item the board is partially cut off by the left edge of the image,
+\item a large fraction of the image is empty wall rather than useful board
+      coverage,
+\item the board is held by hand, which increases the chance of rolling-
+      shutter distortion and small motion during capture,
+\item the image has a strong blue cast, suggesting that white balance is not
+      well controlled, and
+\item the board does not cover enough of the image to constrain the camera
+      model as strongly as a larger, sharper view would.
+\end{itemize}
+
+Frames like these can still contribute some corner observations, but a strong
+calibration dataset should contain many better views with the full board
+visible, wider spatial coverage across the image, sharper corners, and more
+stable lighting. A few weak frames are acceptable, but many weak frames can
+pull the calibration toward a poor solution and inflate the reprojection
+error.
+
+\section{Inspecting Image Information from the Terminal}
+
+It is often useful to inspect calibration images directly from the command
+line before using them. This helps confirm the image format, resolution, and
+basic metadata, and it can reveal whether a tool chain is preserving the
+expected capture settings.
+
+Useful commands include:
+
+\begin{itemize}
+\item \texttt{file path/to/image.jpg} to identify the file type,
+\item \texttt{ffprobe -v error -show\_format -show\_streams path/to/image.jpg}
+      to print image metadata in a structured way, and
+\item \texttt{identify -verbose path/to/image.jpg} if ImageMagick is
+      installed.
+\end{itemize}
+
+For example:
+
+\begin{verbatim}
+file ./data/charuco_left/charuco_0004.jpg
+ffprobe -v error -show_format -show_streams \
+  ./data/charuco_left/charuco_0004.jpg
+\end{verbatim}
+
+These terminal checks are useful when debugging a calibration dataset,
+especially when image dimensions, compression, or metadata do not match the
+expected camera settings.
+
+\section{Inspecting and Changing Stream Settings from the Terminal}
+
+When debugging webcam capture, it is also important to inspect the active
+video stream itself rather than only the saved images. The main Linux tool
+for this is \texttt{v4l2-ctl}.
+
+To list the available webcams:
+
+\begin{verbatim}
+v4l2-ctl --list-devices
+\end{verbatim}
+
+To inspect one device or stream in detail:
+
+\begin{verbatim}
+v4l2-ctl -d /dev/video0 --all
+v4l2-ctl -d /dev/video0 --list-ctrls-menu
+\end{verbatim}
+
+The \texttt{--all} output shows the active resolution, pixel format, frame
+rate, and current control values. In our case, this kind of output revealed
+that the webcam was streaming at \texttt{1280x720}, using \texttt{MJPG}, and
+running with auto exposure and auto white balance enabled.
+
+Those settings matter because they affect blur, color consistency, and the
+repeatability of the calibration images.
+
+To change camera controls, use \texttt{--set-ctrl}. For example:
+
+\begin{verbatim}
+v4l2-ctl -d /dev/video0 --set-ctrl=white_balance_automatic=0
+v4l2-ctl -d /dev/video0 --set-ctrl=white_balance_temperature=4600
+v4l2-ctl -d /dev/video0 --set-ctrl=auto_exposure=1
+v4l2-ctl -d /dev/video0 --set-ctrl=exposure_time_absolute=157
+v4l2-ctl -d /dev/video0 --set-ctrl=gain=0
+v4l2-ctl -d /dev/video0 --set-ctrl=backlight_compensation=0
+v4l2-ctl -d /dev/video0 --set-ctrl=power_line_frequency=2
+\end{verbatim}
+
+These commands move the webcam into a more repeatable calibration state:
+manual white balance, manual exposure, low gain, disabled backlight
+compensation, and 60 Hz anti-flicker mode.
+
+Some stream parameters can also be changed directly:
+
+\begin{verbatim}
+v4l2-ctl -d /dev/video0 --set-fmt-video=width=1280,height=720,\
+pixelformat=MJPG
+v4l2-ctl -d /dev/video0 --set-parm=25
+\end{verbatim}
+
+After changing controls or stream settings, it is good practice to re-run
+\texttt{v4l2-ctl -d /dev/video0 --all}. This confirms that the webcam
+accepted the requested configuration. Not every device supports every mode,
+and some controls become inactive depending on whether the camera is in
+automatic or manual mode.
+
+\section{Why We Start with Standard Calibration}
+
+A true rolling-shutter calibration model would estimate not only intrinsics
+and distortion, but also readout timing and the effect of motion during
+capture. That is a more advanced problem and usually requires stronger
+assumptions, more specialized solvers, or controlled motion sequences.
+
+For \texttt{libframe}, the immediate goal is more practical:
+
+\begin{itemize}
+\item obtain stable intrinsics for each webcam,
+\item calibrate the stereo geometry,
+\item rectify left and right images, and
+\item support downstream depth and tracking experiments.
+\end{itemize}
+
+If reprojection errors remain high after using the correct board definition
+and carefully captured static images, then rolling-shutter effects become a
+stronger candidate explanation. At that point, it would make sense to
+investigate tighter capture discipline, synchronized acquisition, or a
+dedicated rolling-shutter-aware calibration method.
+
+\section{Summary}
+
+Global shutter cameras match the assumptions of classical calibration
+directly because each frame is captured at one instant. Rolling shutter
+cameras violate that assumption when the camera or target moves during
+readout. However, if motion is kept small, rolling shutter webcams can still
+be calibrated effectively with a standard ChArUco-based pipeline.
+
+The procedure in this project is therefore to use static, well-lit ChArUco
+captures, estimate intrinsics and distortion with standard OpenCV
+calibration, reject bad frames, and then use those results as the basis for
+stereo rectification and later 3D processing.
+
+\end{document}

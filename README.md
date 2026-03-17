@@ -13,6 +13,15 @@ This involves stereo calibration and rectification with chessboard images, estim
 We will also work on visualizing matched points, epipolar lines, and reprojection error.
 
 ```
+
+./build/app/capture_charuco \
+  --device /dev/video0 \
+  --output-dir ./data/charuco_left \
+  --headless \
+  --save-interval 2.0 \
+  --min-corners 12 \
+  --max-images 20
+
 ./build/app/capture_charuco \
   --device /dev/video2 \
   --output-dir ./data/charuco_right \
@@ -27,10 +36,22 @@ We will also work on visualizing matched points, epipolar lines, and reprojectio
   --squares-y 8 \
   --square-length 0.022 \
   --marker-length 0.016 \
+  --dictionary DICT_4X4 \
+  --max-frame-error 3.0 \
+  --max-rejection-passes 5 \
+  --output ./data/charuco_calibration.json\
+
+./build/app/calibrate_camera \
+  ./data/charuco_left \
+  --squares-x 11 \
+  --squares-y 8 \
+  --square-length 0.022 \
+  --marker-length 0.016 \
   --dictionary DICT_4X4_50 \
   --max-frame-error 3.0 \
   --max-rejection-passes 5 \
   --output ./data/charuco_calibration.json
+
 ```
 ### Disparity-to-depth pipeline
 We will implement stereo matching and convert disparity into depth maps. Measure an object distance too.
